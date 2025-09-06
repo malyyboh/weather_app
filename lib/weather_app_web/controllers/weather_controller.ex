@@ -1,30 +1,6 @@
 defmodule WeatherAppWeb.WeatherController do
   use WeatherAppWeb, :controller
 
-  @cities_weather %{
-    "Київ" => %{
-      temperature: "22°C",
-      condition: "хмарно",
-      humidity: "65%",
-      wind: "5 м/с",
-      precipitation: "без опадів"
-    },
-    "Львів" => %{
-      temperature: "18°C",
-      condition: "сонячно",
-      humidity: "45%",
-      wind: "3 м/с",
-      precipitation: "без опадів"
-    },
-    "Варшава" => %{
-      temperature: "15°C",
-      condition: "дощ",
-      humidity: "85%",
-      wind: "8 м/с",
-      precipitation: "легкий дощ"
-    }
-  }
-
   def index(conn, %{"city" => city}) do
     normalized_city = String.capitalize(city)
     weather_data = fetch_weather_data(normalized_city)
@@ -41,8 +17,36 @@ defmodule WeatherAppWeb.WeatherController do
   end
 
   defp fetch_weather_data(city) do
+    case WeatherApp.WeatherCache.get_weather(city) do
+      {:ok, cached_data} ->
+        cached_data
+
+      :cache_expired ->
+        fetch_and_cache_weather(city)
+
+      :not_found ->
+        fetch_and_cache_weather(city)
+    end
+  end
+
+  defp fetch_and_cache_weather(city) do
     api_key = System.get_env("OPENWEATHER_API_KEY")
 
+    if is_nil(api_key) or api_key == "" do
+      "API key not configured"
+    else
+      case make_api_request(city, api_key) do
+        weather_data when is_map(weather_data) ->
+          WeatherApp.WeatherCache.put_weather(city, weather_data)
+          weather_data
+
+        error_message ->
+          error_message
+      end
+    end
+  end
+
+  defp make_api_request(city, api_key) do
     url = "https://api.openweathermap.org/data/2.5/weather"
 
     case Req.get(url,
@@ -57,16 +61,19 @@ defmodule WeatherAppWeb.WeatherController do
         parse_weather_response(body)
 
       {:ok, %{status: 401}} ->
-        "Помилка: перевірте API ключ"
+        "Invalid API key"
 
       {:ok, %{status: 404}} ->
-        "Місто не знайдено"
+        "City '#{city}' not found"
 
-      {:ok, %{status: status}} ->
-        "Помилка API: #{status}"
+      {:ok, %{status: 429}} ->
+        "API rate limit exceeded"
+
+      {:error, %{reason: :timeout}} ->
+        "API request timeout"
 
       {:error, _reason} ->
-        "Помилка з'єднання з API погоди"
+        "Weather service connection error"
     end
   end
 
@@ -74,24 +81,35 @@ defmodule WeatherAppWeb.WeatherController do
     weather_info = List.first(api_response["weather"], %{})
 
     %{
-      temperature: "#{api_response["main"]["temp"]}°C",
+      temperature: format_temperature(api_response["main"]["temp"]),
       condition: weather_info["description"] || "невідомо",
       humidity: "#{api_response["main"]["humidity"]}%",
-      wind: "#{api_response["wind"]["speed"]} м/с",
+      wind: format_wind_speed(api_response["wind"]["speed"]),
       precipitation: get_precipitation(api_response)
     }
+  end
+
+  defp format_temperature(temp) when is_number(temp) do
+    "#{round(temp)}°C"
+  end
+
+  defp format_wind_speed(speed) when is_number(speed) do
+    formatted_speed = Float.round(speed, 1)
+    "#{formatted_speed} m/s"
   end
 
   defp get_precipitation(api_response) do
     cond do
       api_response["rain"] && api_response["rain"]["1h"] > 0 ->
-        "дощ: #{api_response["rain"]["1h"]} мм/год"
+        rain_amount = Float.round(api_response["rain"]["1h"], 1)
+        "rain: #{rain_amount} mm/h"
 
       api_response["snow"] && api_response["snow"]["1h"] > 0 ->
-        "сніг: #{api_response["snow"]["1h"]} мм/год"
+        snow_amount = Float.round(api_response["snow"]["1h"], 1)
+        "snow: #{snow_amount} mm/h"
 
       true ->
-        "без опадів"
+        "no precipitation"
     end
   end
 end

@@ -1,28 +1,28 @@
 <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-  <h1>Додаток Погоди</h1>
+  <h1>Weather App</h1>
   
-<!-- Форма -->
+<!-- Form -->
   <form action="/weather" method="get">
     <input
       type="text"
       name="city"
-      placeholder="Введіть назву міста"
+      placeholder="Enter city name"
       value={if assigns[:city], do: assigns[:city], else: ""}
     />
-    <button type="submit">Показати погоду</button>
+    <button type="submit">Show Weather</button>
   </form>
   
-<!-- Область результатів -->
+<!-- Result-->
   <%= if assigns[:weather] do %>
     <div style="margin-top: 30px; padding: 20px; border: 1px solid #ccc;">
       <%= if is_map(assigns[:weather]) do %>
-        <h2>Погода в місті: {assigns[:city]}</h2>
+        <h2>Weather in: {assigns[:city]}</h2>
         <!-- Тут відобразимо дані про погоду -->
-        <p>Температура: {assigns[:weather].temperature}</p>
-        <p>Стан: {assigns[:weather].condition}</p>
-        <p>Вологість: {assigns[:weather].humidity}</p>
-        <p>Вітер: {assigns[:weather].wind}</p>
-        <p>Опади: {assigns[:weather].precipitation}</p>
+        <p>Temperature: {assigns[:weather].temperature}</p>
+        <p>Weather: {assigns[:weather].condition}</p>
+        <p>Humidity: {assigns[:weather].humidity}</p>
+        <p>Wind: {assigns[:weather].wind}</p>
+        <p>Precipitation: {assigns[:weather].precipitation}</p>
       <% else %>
         <!-- Показуємо помилку -->
         <p style="color: red;">{assigns[:weather]}</p>

@@ -16,6 +16,7 @@ defmodule WeatherApp.Application do
       # Start a worker by calling: WeatherApp.Worker.start_link(arg)
       # {WeatherApp.Worker, arg},
       # Start to serve requests, typically the last entry
+      WeatherApp.WeatherCache,
       WeatherAppWeb.Endpoint
     ]
 
